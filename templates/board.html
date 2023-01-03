@@ -7,6 +7,26 @@
     <title>Board</title>
 </head>
 <body>
-    board main
+    <h1>Py-Board</h1>
+    <table border="1">
+        <tr>
+            <td>NO</td>
+            <td>제목</td>
+            <td>작성자</td>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td><a href="">제목예시</a></td>
+            <td>작성자예시</td>
+        </tr>
+    </table>
+    <div>
+        <button type="button" onclick="window.location.href='/'">홈으로</button>
+        {% if session['id'] %}
+        <form action="">
+            <button type="submit">글쓰기</button>
+        </form>
+        {% endif %}
+    </div>
 </body>
 </html>

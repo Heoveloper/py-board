@@ -8,8 +8,16 @@
 </head>
 <body>
     <h1>PY-BOARD COMMUNITY</h1>
-    <button onclick="window.location.href='/board'">커뮤니티 입장</button>
     <button onclick="window.location.href='/login'">로그인</button>
     <button onclick="window.location.href='/sign-up'">회원가입</button>
+    <button onclick="window.location.href='/board'">커뮤니티 입장</button>
+
+    {% if session['id'] %}
+    <div>
+        <form action="" method="POST">
+            <button type="submit">로그아웃</button>
+        </form>
+    </div>
+    {% endif %}
 </body>
 </html>
