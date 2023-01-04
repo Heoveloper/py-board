@@ -14,9 +14,9 @@ app = Flask(__name__)
 app.secret_key = "ABCDEFGGFEDCBA"
 
 app.config.update(
-			DEBUG = True,
-			JWT_SECRET_KEY = "I'M IML"
-		)
+    DEBUG = True,
+    JWT_SECRET_KEY = "I'M IML"
+)
 jwtt = JWTManager(app)
 
 # 라우팅: route() 데코레이터는 Flask에서 URL 방문할 때 준비된 함수가 트리거되도록 바인딩
@@ -121,6 +121,26 @@ def login():
                 return redirect('/')
             else:
                 return "잘못된 정보입니다."
+
+# 토큰이 존재하면 블록리스트에 토큰을 넣음
+@jwtt.token_in_blocklist_loader
+def check_it_token_is_revoked(jwt_header, jwt_paypoad):
+    jti = jwt_paypoad['jti']
+    return jti in jwt_blocklist
+
+# 토큰을 저장하기 위한 변수 초기화
+jwt_blocklist = set()
+
+# 토큰이 존재하면 코드 수행
+# jti: 토큰을 고유ID로 저장
+# jwt_blocklist: 토큰의 고유ID, 토큰 유지 기간, 토큰 유지 기간 설정 여부
+# jwt_bloacklist에 jti만 넣어주고 생략하면 토큰 즉시 파괴
+@app.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    jti = get_jwt()['jti']
+    jwt_blocklist.add(jti)
+    return {'message' : 'Log Out'}
 
 @app.route('/board')
 def board():
