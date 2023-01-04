@@ -12,7 +12,7 @@
     <button onclick="window.location.href='/sign-up'">회원가입</button>
     <button onclick="window.location.href='/board'">커뮤니티 입장</button>
 
-    {% if session['id'] %}
+    {% if token %}
     <div>
         <form action="" method="POST">
             <button type="submit">로그아웃</button>

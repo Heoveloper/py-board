@@ -4,17 +4,19 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../static/login.js"></script>
     <title>Login</title>
 </head>
 <body>
     <form class="login" action="" method="POST">
         <div>
-            <input type="text" placeholder="아이디를 입력하세요." name="id">
+            <input id="id" type="text" placeholder="아이디를 입력하세요." name="id">
         </div>
         <div>
-            <input type="password" placeholder="비밀번호를 입력하세요." name="pw">
+            <input id="pw" type="password" placeholder="비밀번호를 입력하세요." name="pw">
         </div>
         <div>
+            <!-- <button type="button" onclick="login()">로그인</button> -->
             <button type="submit">로그인</button>
             <button type="button" onclick="window.location.href='/'">취소</button>
         </div>
