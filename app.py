@@ -176,6 +176,38 @@ def write():
         conn.commit()
         return "작성 완료!"
 
+@app.route('/board/modify', methods=['POST'])
+@jwt_required()
+def modify():
+    cur_user = get_jwt_identity()
+
+    if cur_user is None:
+        return "user only!"
+    else:
+        # writer_num = request.form['writer_num']
+        # writer_nickname = request.form['writer_nickname']
+        title = request.form['title']
+        contents = request.form['contents']
+        post_num = request.form['post_num']
+
+        # MySQL 연결
+        conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
+        # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
+        cur = conn.cursor()
+        # 실행할 SQL문 정의
+        sql = '''
+        update board
+        set title=%s, contents=%s
+        where post_num=%s
+        '''
+        # SQL문에 들어갈 변수(가입 시 입력받을 값들)
+        vals = (title, contents, post_num)
+        # cursor.execute(sql): sql문 실행
+        cur.execute(sql, vals)
+        # commit 필요한 작업일 경우 commit
+        conn.commit()
+        return "수정 완료!"
+
 # 직접 이 파일을 실행했을 때는 if문 문장이 참이 되어 app.run() 수행
 if __name__ == '__main__':
     # debug=True 명시하면 해당 파일 코드 수정 시 Flask가 변경된 것을 인식하고 다시 시작
