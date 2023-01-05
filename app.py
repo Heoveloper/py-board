@@ -151,6 +151,7 @@ def board():
 @jwt_required()
 def write():
     cur_user = get_jwt_identity()
+    print(cur_user)
 
     if cur_user is None:
         return "user only!"
@@ -183,6 +184,7 @@ def modify():
     cur_user = get_jwt_identity()
 
     post_num = request.form['post_num']
+    ### writer_num = request.form['writer_num']
 
     # MySQL 연결
     conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
@@ -207,11 +209,22 @@ def modify():
     print(now - credate[0]) # 현재시각-작성시각
     print(credate[0] + delta) # 현재시각+1시간
     # print(hour[0]+'1')
+
+    ### sql_writer = '''
+    # select writer_nickname from board where writer_num=%s;
+    # '''
+    # vals_writer = (writer_num)
+    # cur.execute(sql_writer, vals_writer)
+    # writer_nick = cur.fetchone();
+    # print(writer_nick)
+    ### print(writer_nick[0])
     
     if cur_user is None:
         return "user only!"
     elif now > credate[0]+delta:
         return "1시간 지나서 수정 안돼"
+    ### elif cur_user != writer_nick:
+    ###     return "작성자도 아니면서 수정은 좀.."
     else:
         title = request.form['title']
         contents = request.form['contents']
@@ -240,16 +253,44 @@ def modify():
 def delete():
     cur_user = get_jwt_identity()
 
+    param = request.get_json()
+    post_num = param['post_num']
+
+    # MySQL 연결
+    conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
+    # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
+    cur = conn.cursor()
+    # 실행할 SQL문 정의
+    # sql = "select date_format(cdate, '%%h') From board where post_num=%s;"
+    sql = '''
+    select cdate from board where post_num=%s;
+    '''
+    # SQL문에 들어갈 변수(가입 시 입력받을 값들)
+    vals = (post_num)
+    # cursor.execute(sql): sql문 실행
+    cur.execute(sql, vals)
+    credate = cur.fetchone(); # sql문 돌리고 뽑은 작성시각
+    now = datetime.datetime.now() # 현재시각
+    delta = datetime.timedelta(hours = 3) # 3시간
+    #delta = datetime.timedelta(seconds = 5) # 실험용 5초
+
+    print(now)
+    print(credate[0])
+    print(credate[0]+delta)
+    print(now > credate[0]+delta) # 현재시각이 작성시각+3시간보다 크면 true
+
     if cur_user is None:
         return "user only!"
+    elif now > credate[0]+delta:
+        return "3시간 지나면 삭제도 안돼(실험: 5초)"
     else:
         param = request.get_json()
         post_num = param['post_num']
 
         # MySQL 연결
-        conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
+        #conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
         # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-        cur = conn.cursor()
+        #cur = conn.cursor()
         # 실행할 SQL문 정의
         sql = '''
         delete from board
