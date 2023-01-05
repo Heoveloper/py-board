@@ -9,6 +9,7 @@ from flask_jwt_extended import *
 # import requests, json #사용 안하는 중
 import jwt
 from datetime import datetime, timedelta
+import datetime
 
 app = Flask(__name__)
 app.secret_key = "ABCDEFGGFEDCBA"
@@ -181,17 +182,45 @@ def write():
 def modify():
     cur_user = get_jwt_identity()
 
+    post_num = request.form['post_num']
+
+    # MySQL 연결
+    conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
+    # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
+    cur = conn.cursor()
+    # 실행할 SQL문 정의
+    # sql = "select date_format(cdate, '%%h') From board where post_num=%s;"
+    sql = '''
+    select cdate from board where post_num=%s;
+    '''
+    # SQL문에 들어갈 변수(가입 시 입력받을 값들)
+    vals = (post_num)
+    # cursor.execute(sql): sql문 실행
+    cur.execute(sql, vals)
+    credate = cur.fetchone(); # sql문 돌리고 뽑은 작성시각
+    now = datetime.datetime.now() # 현재시각
+    delta = datetime.timedelta(hours = 1) # 1시간
+    print(now)
+    print(delta)
+    print(credate[0])
+    print(now > credate[0]+delta) # 현재시각이 작성시각+1시간보다 크면 true
+    print(now - credate[0]) # 현재시각-작성시각
+    print(credate[0] + delta) # 현재시각+1시간
+    # print(hour[0]+'1')
+    
     if cur_user is None:
         return "user only!"
+    elif now > credate[0]+delta:
+        return "1시간 지나서 수정 안돼"
     else:
         title = request.form['title']
         contents = request.form['contents']
         post_num = request.form['post_num']
 
         # MySQL 연결
-        conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
+        # conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
         # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-        cur = conn.cursor()
+        # cur = conn.cursor()
         # 실행할 SQL문 정의
         sql = '''
         update board
