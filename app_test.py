@@ -1,17 +1,9 @@
 # from flask import Flask, render_template, redirect, request, url_for
 # from flaskext.mysql import MySQL
-
+###############
 # mysql = MySQL()
 # app = Flask(__name__)
-
-# # 데이터베이스 값 설정
-# app.config['MYSQL_DATABASE_USER'] = 'root'
-# app.config['MYSQL_DATABASE_PASSWORD'] = 'admin1234'
-# app.config['MYSQL_DATABASE_DB'] = 'mydb'
-# app.config['MYSQL_DATABASE_HOST'] = '127.0.0.1:5000'
-# app.secret_key = "ABCDEFGGFEDCBA"
-# mysql.init_app(app)
-
+###############
 # @app.route('/register', methods=['GET', 'POST'])
 # def register():
 #     if request.method == 'POST':
@@ -34,8 +26,7 @@
 #             return "가입 실패"
     
 #     return render_template('sign-up.html')
-
-
+###############
 # @app.route('/login', methods=['GET', 'POST'])
 # def login():
 #     # 요청 메소드가 GET일 때
@@ -72,8 +63,22 @@
 #             print(session['id'])
 
 #             return redirect('/')
+###############
+# 로그인시 토큰 발행 예전
+# payload = {
+#     'id': res[1],
+#     # exp(expiration) - 토큰 만료시간: 로그인 24시간 유지
+#     'exp': datetime.utcnow() + timedelta(seconds=60)
+# }
 
+# token = jwt.encode(payload, app.secret_key, algorithm="HS256")
+# decode = jwt.decode(token, app.secret_key, algorithms="HS256")
+# print(token)
+# print(decode)
 
+# return jsonify({'result': 'success', 'token': access_token})
+# return jsonify({'result': 'success', 'token': token})
+###############
 # if __name__ == '__main__':
 #     # debug=True 명시하면 해당 파일 코드 수정 시 Flask가 변경된 것을 인식하고 다시 시작
 #     app.run(debug=True)

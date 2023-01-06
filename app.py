@@ -1,24 +1,32 @@
+##### 모듈 #####
 # from 모듈이름 import 모듈함수
-#
 import os
-import pymysql # mysql을 python에서 사용할 시 추가
-from flask import Flask, render_template, redirect, request, url_for, session, jsonify
-from flask_jwt_extended import *
-# from flaskext.mysql import MySQL
-# requests: HTTP 통신이 필요한 프로그램을 작성할 때 사용하는 라이브러리
-# import requests, json #사용 안하는 중
 import jwt
+import pymysql # mysql을 python에서 사용할 시 추가
+from flask import Flask, render_template, redirect, request, session, url_for, jsonify
+from flask_jwt_extended import *
 from datetime import datetime, timedelta
 import datetime
+from config import HOST, USER, PASSWORD, DB, CHARSET, APP_SECRET_KEY, JWT_SECRET_KEY # 환경변수
+####################
 
 app = Flask(__name__)
-app.secret_key = "ABCDEFGGFEDCBA"
+app.secret_key = APP_SECRET_KEY
 
+##### JWT 설정 #####
 app.config.update(
     DEBUG = True,
-    JWT_SECRET_KEY = "I'M IML"
+    JWT_SECRET_KEY = JWT_SECRET_KEY
 )
-jwtt = JWTManager(app)
+jwtm = JWTManager(app)
+####################
+
+##### DB 연결 #####
+# MySQL 연결
+conn = pymysql.connect(host=HOST, user=USER, password=PASSWORD, db=DB, charset=CHARSET)
+# 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
+cur = conn.cursor()
+####################
 
 # 라우팅: route() 데코레이터는 Flask에서 URL 방문할 때 준비된 함수가 트리거되도록 바인딩
 @app.route('/', methods=['GET', 'POST'])
@@ -26,9 +34,7 @@ def home():
     if request.method == 'GET':
         return render_template("index.html")
     elif request.method == 'POST':
-        session.pop('id', None) # 세션 삭제
-        return redirect('/')
-
+        return redirect('/logout')
 
 # route() 데코레이터의 methods 인수로 POST를 지정해서 POST요청도 처리
 @app.route('/sign-up', methods=['GET', 'POST'])
@@ -52,10 +58,6 @@ def signUp():
             return "비밀번호가 일치하지 않습니다."
         # 입력이 정상일 경우 하위 명령 실행 (DB에 입력된다.)
         else:
-            # MySQL 연결
-            conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-            # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-            cur = conn.cursor()
             # 실행할 SQL문 정의
             sql = '''
             insert into member(id, pw, nickname)
@@ -85,10 +87,6 @@ def login():
         if len(id) == 0 or len(pw) == 0:
             return "입력되지 않은 정보가 있습니다."
         else:
-            # MySQL 연결
-            conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-            # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-            cur = conn.cursor()
             # 실행할 SQL문 정의
             sql = '''
             select * from member
@@ -100,31 +98,18 @@ def login():
             res = cur.fetchone();
 
             if res:
-                print(res)
-                print(res[1])
+                print(res) # (Member_num, ID, PW, Nickname, IsAdmin)
+                print(res[1]) # ID
 
                 access_token = create_access_token(identity=res[1], expires_delta=False, fresh=timedelta(minutes=15))
-                print(access_token)
+                print(access_token) # 인코딩된 토큰
 
-                # payload = {
-                #     'id': res[1],
-                #     # exp(expiration) - 토큰 만료시간: 로그인 24시간 유지
-                #     'exp': datetime.utcnow() + timedelta(seconds=60)
-                # }
-
-                # token = jwt.encode(payload, app.secret_key, algorithm="HS256")
-                # decode = jwt.decode(token, app.secret_key, algorithms="HS256")
-                # print(token)
-                # print(decode)
-
-                # return jsonify({'result': 'success', 'token': access_token})
-                # return jsonify({'result': 'success', 'token': token})
                 return redirect('/')
             else:
                 return "잘못된 정보입니다."
 
 # 토큰이 존재하면 블록리스트에 토큰을 넣음
-@jwtt.token_in_blocklist_loader
+@jwtm.token_in_blocklist_loader
 def check_it_token_is_revoked(jwt_header, jwt_paypoad):
     jti = jwt_paypoad['jti']
     return jti in jwt_blocklist
@@ -161,10 +146,6 @@ def write():
         title = request.form['title']
         contents = request.form['contents']
 
-        # MySQL 연결
-        conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-        # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-        cur = conn.cursor()
         # 실행할 SQL문 정의
         sql = '''
         insert into board(writer_num, writer_nickname, title, contents)
@@ -186,10 +167,6 @@ def modify():
     post_num = request.form['post_num']
     ### writer_num = request.form['writer_num']
 
-    # MySQL 연결
-    conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-    # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-    cur = conn.cursor()
     # 실행할 SQL문 정의
     # sql = "select date_format(cdate, '%%h') From board where post_num=%s;"
     sql = '''
@@ -230,10 +207,6 @@ def modify():
         contents = request.form['contents']
         post_num = request.form['post_num']
 
-        # MySQL 연결
-        # conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-        # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-        # cur = conn.cursor()
         # 실행할 SQL문 정의
         sql = '''
         update board
@@ -256,10 +229,6 @@ def delete():
     param = request.get_json()
     post_num = param['post_num']
 
-    # MySQL 연결
-    conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-    # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-    cur = conn.cursor()
     # 실행할 SQL문 정의
     # sql = "select date_format(cdate, '%%h') From board where post_num=%s;"
     sql = '''
@@ -287,10 +256,6 @@ def delete():
         param = request.get_json()
         post_num = param['post_num']
 
-        # MySQL 연결
-        #conn = pymysql.connect(host='127.0.0.1', user='root', password='admin1234', db='mydb', charset='utf8')
-        # 커서 객체 생성 (커서 객체에 DB작업을 위한 함수들이 포함)
-        #cur = conn.cursor()
         # 실행할 SQL문 정의
         sql = '''
         delete from board
