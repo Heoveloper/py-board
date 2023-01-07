@@ -8,6 +8,7 @@ from flask_jwt_extended import *
 from datetime import datetime, timedelta
 import datetime
 from config import HOST, USER, PASSWORD, DB, CHARSET, APP_SECRET_KEY, JWT_SECRET_KEY # 환경변수
+from random import randrange # 난수 생성에 필요한 모듈
 ####################
 
 app = Flask(__name__)
@@ -243,29 +244,66 @@ def delete():
         return "삭제 완료!"
 
 @app.route('/board/comment/write', methods=['POST'])
-# @jwt_required()
+@jwt_required(optional=True)
 def writeComment():
-    # cur_user = get_jwt_identity()
-    # print(f'cur user: {cur_user}')
+    cur_user = get_jwt_identity()
 
-    # if cur_user is None:
-        # return "user only!"
-    # else:
-        post_num = request.form['post_num']
-        member_num = request.form['member_num']
-        member_nickname = request.form['member_nickname']
-        contents = request.form['contents']
+    post_num = request.form['post_num']
+    member_num = request.form['member_num']
+    member_nickname = request.form['member_nickname']
+    contents = request.form['contents']
 
+    # 비회원 댓글 작성 시
+    if cur_user is None:
+        nonmember_num = randrange(100000)
+        nonmember_nickname = f'비회원_{nonmember_num}'
+        print(f'비회원번호: {nonmember_num}')
+        print(f'비회원닉네임: {nonmember_nickname}')
         # 실행할 SQL문 정의
         sql = f'''
         insert into comment(post_num, member_num, member_nickname, contents)
-        values ('{post_num}', '{member_num}', '{member_nickname}', '{contents}')
+        values ({post_num}, {nonmember_num}, '{nonmember_nickname}', '{contents}')
         '''
-        # cursor.execute(sql): sql문 실행
+    # 회원 댓글 작성 시
+    else:
+        # 실행할 SQL문 정의
+        sql = f'''
+        insert into comment(post_num, member_num, member_nickname, contents)
+        values ({post_num}, {member_num}, '{member_nickname}', '{contents}')
+        '''
+
+    # cursor.execute(sql): sql문 실행
+    cur.execute(sql)
+    # commit 필요한 작업일 경우 commit
+    conn.commit()
+    return "댓글 작성 완료!"
+
+@app.route('/board/comment/modify', methods=['PATCH'])
+@jwt_required(optional=True)
+def modifyComment():
+    cur_user = get_jwt_identity()
+
+    param = request.get_json()
+    comment_num = param['comment_num']
+    contents = param['contents']
+
+    # 작성자만 삭제 가능
+    sqlm = f"select member_num from comment where comment_num='{comment_num}'"
+    cur.execute(sqlm)
+    member_num = cur.fetchone();
+    print(f'member_num: {member_num[0]}')
+
+    if cur_user is None:
+        return "user only!"
+    elif not cur_user == member_num[0]:
+        return "댓글 작성자만 수정 가능합니다."
+    else:
+        sql = f'''
+        update comment set contents='{contents}' where comment_num={comment_num}
+        '''
         cur.execute(sql)
-        # commit 필요한 작업일 경우 commit
         conn.commit()
-        return "댓글 작성 완료!"
+        return "댓글 수정 완료!"
 
 
 # 직접 이 파일을 실행했을 때는 if문 문장이 참이 되어 app.run() 수행
