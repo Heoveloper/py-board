@@ -188,7 +188,7 @@ def modify():
     elif not cur_user == writer_num[0]:
         return "작성자만 수정 가능합니다."
     elif now > credate[0] + delta:
-        return "1시간 지나서 수정 안돼"
+        return "작성 후 1시간이 지나면 수정 불가합니다."
     else:
         # 실행할 SQL문 정의
         sql = f"update board set title='{title}', contents='{contents}' where post_num={post_num}"
@@ -219,12 +219,20 @@ def delete():
     print(f'delta: {delta}')
     print(f'credate[0]: {credate[0]}')
     print(f'credate[0] + delta: {credate[0]+delta}')
-    print(f'현재시각 > 작성시각 + 1시간: {now > credate[0] + delta}')
+    print(f'현재시각 > 작성시각 + 3시간: {now > credate[0] + delta}')
+
+    # 작성자만 삭제 가능
+    sqlw = f"select writer_num from board where post_num='{post_num}'"
+    cur.execute(sqlw)
+    writer_num = cur.fetchone();
+    print(f'writer_num: {writer_num[0]}')
 
     if cur_user is None:
         return "user only!"
+    elif not cur_user == writer_num[0]:
+        return "작성자만 삭제 가능합니다."
     elif now > credate[0] + delta:
-        return "3시간 지나면 삭제도 안돼"
+        return "작성 후 3시간이 지나면 삭제 불가합니다."
     else:
         # 실행할 SQL문 정의
         sql = f"delete from board where post_num='{post_num}'"
@@ -233,6 +241,32 @@ def delete():
         # commit 필요한 작업일 경우 commit
         conn.commit()
         return "삭제 완료!"
+
+@app.route('/board/comment/write', methods=['POST'])
+# @jwt_required()
+def writeComment():
+    # cur_user = get_jwt_identity()
+    # print(f'cur user: {cur_user}')
+
+    # if cur_user is None:
+        # return "user only!"
+    # else:
+        post_num = request.form['post_num']
+        member_num = request.form['member_num']
+        member_nickname = request.form['member_nickname']
+        contents = request.form['contents']
+
+        # 실행할 SQL문 정의
+        sql = f'''
+        insert into comment(post_num, member_num, member_nickname, contents)
+        values ('{post_num}', '{member_num}', '{member_nickname}', '{contents}')
+        '''
+        # cursor.execute(sql): sql문 실행
+        cur.execute(sql)
+        # commit 필요한 작업일 경우 commit
+        conn.commit()
+        return "댓글 작성 완료!"
+
 
 # 직접 이 파일을 실행했을 때는 if문 문장이 참이 되어 app.run() 수행
 if __name__ == '__main__':
