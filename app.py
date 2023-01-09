@@ -41,8 +41,6 @@ cur = conn.cursor()
 @app.route('/admin')
 @jwt_required(optional=True)
 def isAdmin():
-    # global cur_user
-    # cur_user = curUser()
     cur_user = get_jwt_identity()
 
     sql = f"select is_admin from member where member_num={cur_user}"
@@ -51,8 +49,9 @@ def isAdmin():
 
     isAdmin = cur.fetchone()
     print(f'현재 접속 회원의 관리자 여부: {isAdmin[0]}')
+    # print(jsonify(isAdmin[0]))
     
-    return jsonify(isAdmin[0])
+    return isAdmin
 ####################
 
 # 라우팅: route() 데코레이터는 Flask에서 URL 방문할 때 준비된 함수가 트리거되도록 바인딩
@@ -214,22 +213,22 @@ def modify():
     cur.execute(sqlw)
     writer_num = cur.fetchone();
     print(f'writer_num: {writer_num[0]}')
+    print(f'admin: {admin}')
 
-    if not admin == 1:
-        if cur_user is None:
-            return "user only!"
-        elif not cur_user == writer_num[0]:
-            return "작성자만 수정 가능합니다."
-        elif now > credate[0] + delta:
-            return "작성 후 1시간이 지나면 수정 불가합니다."
-        else:
-            # 실행할 SQL문 정의
-            sql = f"update board set title='{title}', contents='{contents}' where post_num={post_num}"
-            # cursor.execute(sql): sql문 실행
-            cur.execute(sql)
-            # commit 필요한 작업일 경우 commit
-            conn.commit()
-            return "수정 완료!"
+    if admin[0] == 1:
+        # 실행할 SQL문 정의
+        sql = f"update board set title='{title}', contents='{contents}' where post_num={post_num}"
+        # cursor.execute(sql): sql문 실행
+        cur.execute(sql)
+        # commit 필요한 작업일 경우 commit
+        conn.commit()
+        return "관리자가 수정 완료!"
+    elif cur_user is None:
+        return "user only!"
+    elif not cur_user == writer_num[0]:
+        return "작성자만 수정 가능합니다."
+    elif now > credate[0] + delta:
+        return "작성 후 1시간이 지나면 수정 불가합니다."
     else:
         # 실행할 SQL문 정의
         sql = f"update board set title='{title}', contents='{contents}' where post_num={post_num}"
