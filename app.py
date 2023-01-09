@@ -117,8 +117,12 @@ jwt_blocklist = set()
 @app.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
+    cur_user = get_jwt_identity()
+
     jti = get_jwt()['jti']
     jwt_blocklist.add(jti)
+
+    print(f"로그아웃한 회원의 번호: {cur_user}")
     return {'message' : 'Log Out'}
 ##############################
 
@@ -165,7 +169,7 @@ def modify():
 
     # 실행할 SQL문 정의
     # sql = "select date_format(cdate, '%%h') From board where post_num=%s;"
-    sql = f"select cdate from board where post_num='{post_num}'"
+    sql = f"select cdate from board where post_num={post_num}"
     # cursor.execute(sql): sql문 실행
     cur.execute(sql)
 
@@ -179,7 +183,7 @@ def modify():
     print(f'현재시각 + 1시간: {credate[0] + delta}')
 
     # 작성자만 수정 가능
-    sqlw = f"select writer_num from board where post_num='{post_num}'"
+    sqlw = f"select writer_num from board where post_num={post_num}"
     cur.execute(sqlw)
     writer_num = cur.fetchone();
     print(f'writer_num: {writer_num[0]}')
@@ -211,7 +215,7 @@ def delete():
     delta = datetime.timedelta(hours = 3) # 3시간
 
     # 실행할 SQL문 정의
-    sql = f"select cdate from board where post_num='{post_num}'"
+    sql = f"select cdate from board where post_num={post_num}"
     # cursor.execute(sql): sql문 실행
     cur.execute(sql)
 
@@ -223,7 +227,7 @@ def delete():
     print(f'현재시각 > 작성시각 + 3시간: {now > credate[0] + delta}')
 
     # 작성자만 삭제 가능
-    sqlw = f"select writer_num from board where post_num='{post_num}'"
+    sqlw = f"select writer_num from board where post_num={post_num}"
     cur.execute(sqlw)
     writer_num = cur.fetchone();
     print(f'writer_num: {writer_num[0]}')
@@ -287,23 +291,46 @@ def modifyComment():
     comment_num = param['comment_num']
     contents = param['contents']
 
-    # 작성자만 삭제 가능
-    sqlm = f"select member_num from comment where comment_num='{comment_num}'"
+    # 작성자만 수정 가능
+    sqlm = f"select member_num from comment where comment_num={comment_num}"
     cur.execute(sqlm)
     member_num = cur.fetchone();
-    print(f'member_num: {member_num[0]}')
+    print(f'member_num(현재 접속 회원): {member_num[0]}')
 
     if cur_user is None:
         return "user only!"
     elif not cur_user == member_num[0]:
         return "댓글 작성자만 수정 가능합니다."
     else:
-        sql = f'''
-        update comment set contents='{contents}' where comment_num={comment_num}
-        '''
+        sql = f"update comment set contents='{contents}' where comment_num={comment_num}"
         cur.execute(sql)
         conn.commit()
         return "댓글 수정 완료!"
+
+@app.route('/board/comment/delete', methods=['delete'])
+@jwt_required(optional=True)
+def deleteComment():
+    cur_user = get_jwt_identity()
+
+    param = request.get_json()
+    comment_num = param['comment_num']
+
+    # 작성자만 삭제 가능
+    sqlm = f"select member_num from comment where comment_num='{comment_num}'"
+    cur.execute(sqlm)
+    member_num = cur.fetchone();
+    print(f'member_num(현재 접속 회원): {member_num[0]}')
+
+    if cur_user is None:
+        return "user only!"
+    elif not cur_user == member_num[0]:
+        return "댓글 작성자만 삭제 가능합니다."
+    else:
+        sql = f"delete from comment where comment_num={comment_num}"
+        cur.execute(sql)
+        conn.commit()
+        return "댓글 삭제 완료!"
+    
 
 
 # 직접 이 파일을 실행했을 때는 if문 문장이 참이 되어 app.run() 수행
