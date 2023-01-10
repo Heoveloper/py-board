@@ -23,6 +23,13 @@ app.config.update(
 jwtm = JWTManager(app)
 ####################
 
+##### JWT 설정 2 #####
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']
+app.config['JWT_ACCESS_COOKIE_PATH'] = '/api/'
+app.config['JWT_REFRESH_COOKIE_PATH'] = '/token/refresh'
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False
+####################
+
 ##### DB 연결 #####
 # MySQL 연결
 conn = pymysql.connect(host=HOST, user=USER,
@@ -115,37 +122,48 @@ def login():
                     identity=res[0], expires_delta=False, fresh=timedelta(minutes=15))
                 print(f'loginToken: {access_token}')  # 인코딩된 토큰
 
-                return redirect('/')
+                response = make_response(redirect("/"))
+                cookies = set_access_cookies(response, access_token)
+                print(cookies)
+
+                return response
             else:
                 return "잘못된 정보입니다."
 
 
 ########## 로그아웃 ##########
-# 토큰이 존재하면 블록리스트에 토큰을 넣음
-@jwtm.token_in_blocklist_loader
-def check_it_token_is_revoked(jwt_header, jwt_paypoad):
-    jti = jwt_paypoad['jti']
-    return jti in jwt_blocklist
+# # 토큰이 존재하면 블록리스트에 토큰을 넣음
+# @jwtm.token_in_blocklist_loader
+# def check_it_token_is_revoked(jwt_header, jwt_paypoad):
+#     jti = jwt_paypoad['jti']
+#     return jti in jwt_blocklist
 
 
-# 토큰을 저장하기 위한 변수 초기화
-jwt_blocklist = set()
+# # 토큰을 저장하기 위한 변수 초기화
+# jwt_blocklist = set()
 
-# 토큰이 존재하면 코드 수행
-# jti: 토큰을 고유ID로 저장
-# jwt_blocklist: 토큰의 고유ID, 토큰 유지 기간, 토큰 유지 기간 설정 여부
-# jwt_bloacklist에 jti만 넣어주고 생략하면 토큰 즉시 파괴
+# # 토큰이 존재하면 코드 수행
+# # jti: 토큰을 고유ID로 저장
+# # jwt_blocklist: 토큰의 고유ID, 토큰 유지 기간, 토큰 유지 기간 설정 여부
+# # jwt_bloacklist에 jti만 넣어주고 생략하면 토큰 즉시 파괴
+# @app.route('/logout', methods=['POST'])
+# @jwt_required()
+# def logout():
+#     cur_user = get_jwt_identity()
+
+#     jti = get_jwt()['jti']
+#     jwt_blocklist.add(jti)
+
+#     print(f"로그아웃한 회원의 번호: {cur_user}")
+#     return {'message': 'Log Out'}
+##############################
+
 @app.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
-    cur_user = get_jwt_identity()
-
-    jti = get_jwt()['jti']
-    jwt_blocklist.add(jti)
-
-    print(f"로그아웃한 회원의 번호: {cur_user}")
-    return {'message': 'Log Out'}
-##############################
+    response = make_response(redirect("/"))
+    unset_jwt_cookies(response)
+    return response
 
 @app.route('/board/<category>/<status>', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 @jwt_required(optional=True)
