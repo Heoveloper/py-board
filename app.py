@@ -157,15 +157,15 @@ def board(category, status):
 
     # GET 요청이거나, Category가 없거나
     if request.method == 'GET' or category is None:
-        boardHome()
+        return boardHome()
 
     # 댓글 작성
     if category == "comment" and status == "write":
-        writeComment(cur_user)
+        return writeComment(cur_user, admin)
 
     # 공통 유효성 1. 회원만 작성, 수정, 삭제 가능 (댓글 작성 제외)
     if cur_user is None and admin == 0:
-        return "user only!"
+        return make_response(jsonify({"status number" : 401, "status msg" : "Unauthorized", "msg" : "user only!"}), 401)
 
     if request.method == 'POST':
         if status == "write":
@@ -175,16 +175,16 @@ def board(category, status):
     if request.method == 'PATCH':
         if status == "modify":
             if category == "post":
-                modifyPost(cur_user, admin, status)
+                return modifyPost(cur_user, admin, status)
             else:
-                modifyComment(cur_user, admin)
+                return modifyComment(cur_user, admin)
 
     if request.method == 'DELETE':
         if status == "delete":
             if category == "post":
-                deletePost(cur_user, admin, status)
+                return deletePost(cur_user, admin, status)
             else:
-                deleteComment(cur_user, admin)
+                return deleteComment(cur_user, admin)
 
     return make_response(jsonify({"status number" : 200, "msg" : "게시판 작업 테스트 성공"}), 200)
 
@@ -251,9 +251,9 @@ def deletePost(cur_user, admin, status):
     writer_num = writerNum(post_num)
 
     if not cur_user == writer_num and not admin == 1:
-        return "작성자만 삭제 가능합니다."
+        return make_response(jsonify({"status number" : 401, "status msg" : "Unauthorized", "msg" : "작성자만 삭제 가능합니다."}), 401)
     elif not changeStatus(post_num, status) and not admin == 1:
-        return "시간이 초과되어 삭제하실 수 없습니다. (3시간 제한)"
+        return make_response(jsonify({"status number" : 408, "status msg" : "Request Timeout", "msg" : "시간이 초과되어 삭제하실 수 없습니다. (3시간 제한)"}), 408)
     else:
         # 실행할 SQL문 정의
         sql = f"delete from board where post_num='{post_num}'"
@@ -261,47 +261,49 @@ def deletePost(cur_user, admin, status):
         cur.execute(sql)
         # commit 필요한 작업일 경우 commit
         conn.commit()
+
+    if admin == 1:
+        return make_response(jsonify({"status number" : 200, "msg" : "관리자로 게시글 삭제 완료!"}), 200)
+    else:
+        return make_response(jsonify({"status number" : 200, "msg" : "게시글 삭제 완료!"}), 200)
 ####################
 
 ##### 댓글 작성 #####
-def writeComment(cur_user):
-    print('댓글작성함수안의 현재유저: ', cur_user)
+def writeComment(cur_user, admin):
     param = request.get_json()
     post_num = param['post_num']
-    member_num = param['member_num']
-    member_nickname = param['member_nickname']
     contents = param['contents']
-
-    nonmember_num = randrange(100000)
-    nonmember_nickname = f'비회원_{nonmember_num}'
-    print(f'비회원번호: {nonmember_num}')
-    print(f'비회원닉네임: {nonmember_nickname}')
 
     # 비회원 댓글 작성 시
     if cur_user is None:
-        # nonmember_num = randrange(100000)
-        # nonmember_nickname = f'비회원_{nonmember_num}'
-        # print(f'비회원번호: {nonmember_num}')
-        # print(f'비회원닉네임: {nonmember_nickname}')
+        nonmember_num = randrange(100000)
+        nonmember_nickname = f'비회원_{nonmember_num}'
+        print(f'비회원번호: {nonmember_num}')
+        print(f'비회원닉네임: {nonmember_nickname}')
         # 실행할 SQL문 정의
         sql = f'''
         insert into comment(post_num, member_num, member_nickname, contents)
-        values ({post_num}, {nonmember_num}, '{nonmember_nickname}', '{contents}')
+        values ({post_num}, {nonmember_num}, '{nonmember_nickname}', '{contents}');
         '''
     # 회원 댓글 작성 시
     else:
-        # member_num = param['member_num']
-        # member_nickname = param['member_nickname']
+        member_num = param['member_num']
+        member_nickname = param['member_nickname']
         # 실행할 SQL문 정의
         sql = f'''
         insert into comment(post_num, member_num, member_nickname, contents)
-        values ({post_num}, {member_num}, '{member_nickname}', '{contents}')
+        values ({post_num}, {member_num}, '{member_nickname}', '{contents}');
         '''
 
     # cursor.execute(sql): sql문 실행
     cur.execute(sql)
     # commit 필요한 작업일 경우 commit
     conn.commit()
+
+    if admin == 1:
+        return make_response(jsonify({"status number" : 200, "msg" : "관리자로 댓글 작성 완료!"}), 200)
+    else:
+        return make_response(jsonify({"status number" : 200, "msg" : "댓글 작성 완료!"}), 200)
 ####################
 
 ##### 댓글 수정 #####
@@ -312,12 +314,15 @@ def modifyComment(cur_user, admin):
     commenter_num = commenterNum(comment_num)
 
     if not cur_user == commenter_num and not admin == 1:
-        return "댓글 작성자만 수정 가능합니다."
+        return make_response(jsonify({"status number" : 401, "status msg" : "Unauthorized", "msg" : "댓글 작성자만 수정 가능합니다."}), 401)
     else:
         sql = f"update comment set contents='{contents}' where comment_num={comment_num}"
         cur.execute(sql)
         conn.commit()
-        return "댓글 수정 완료!"
+        if admin == 1:
+            return make_response(jsonify({"status number" : 200, "msg" : "관리자로 댓글 수정 완료!"}), 200)
+        else:
+            return make_response(jsonify({"status number" : 200, "msg" : "댓글 수정 완료!"}), 200)
 ####################
 
 ##### 댓글 삭제 #####
@@ -327,12 +332,15 @@ def deleteComment(cur_user, admin):
     commenter_num = commenterNum(comment_num)
 
     if not cur_user == commenter_num and not admin == 1:
-        return "댓글 작성자만 삭제 가능합니다."
+        return make_response(jsonify({"status number" : 401, "status msg" : "Unauthorized", "msg" : "댓글 작성자만 삭제 가능합니다."}), 401)
     else:
         sql = f"delete from comment where comment_num={comment_num}"
         cur.execute(sql)
         conn.commit()
-        return "댓글 삭제 완료!"
+        if admin == 1:
+            return make_response(jsonify({"status number" : 200, "msg" : "관리자로 댓글 삭제 완료!"}), 200)
+        else:
+            return make_response(jsonify({"status number" : 200, "msg" : "댓글 삭제 완료!"}), 200)
 ####################
 
 
