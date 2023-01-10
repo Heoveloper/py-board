@@ -1,9 +1,8 @@
 ##### 모듈 #####
 # from 모듈이름 import 모듈함수
 import os
-import jwt
+import jwt, json, requests
 import pymysql  # mysql을 python에서 사용할 시 추가
-import json
 from flask import Flask, render_template, redirect, request, make_response, session, url_for, jsonify
 from flask_jwt_extended import *
 from datetime import datetime, timedelta
@@ -21,13 +20,6 @@ app.config.update(
     JWT_SECRET_KEY=JWT_SECRET_KEY
 )
 jwtm = JWTManager(app)
-####################
-
-##### JWT 설정 2 #####
-app.config['JWT_TOKEN_LOCATION'] = ['cookies']
-app.config['JWT_ACCESS_COOKIE_PATH'] = '/api/'
-app.config['JWT_REFRESH_COOKIE_PATH'] = '/token/refresh'
-app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 ####################
 
 ##### DB 연결 #####
@@ -118,52 +110,48 @@ def login():
                 print(f'res: {res}')  # (Member_num, ID, PW, Nickname, IsAdmin)
                 print(f'res[0]: {res[0]}')  # Member_num
 
-                access_token = create_access_token(
-                    identity=res[0], expires_delta=False, fresh=timedelta(minutes=15))
+                access_token = create_access_token(identity=res[0], expires_delta=False, fresh=timedelta(minutes=15))
                 print(f'loginToken: {access_token}')  # 인코딩된 토큰
 
-                response = make_response(redirect("/"))
-                cookies = set_access_cookies(response, access_token)
-                print(cookies)
+                # resp = jsonify({'login': True, 'token': f'{access_token}'})
+                # set_access_cookies(resp, access_token)
+
+                response = make_response(redirect('/'))
+                response.set_cookie('token', access_token)
+                session.clear()
+                session['id'] = res[0]
 
                 return response
             else:
                 return "잘못된 정보입니다."
 
 
-########## 로그아웃 ##########
-# # 토큰이 존재하면 블록리스트에 토큰을 넣음
-# @jwtm.token_in_blocklist_loader
-# def check_it_token_is_revoked(jwt_header, jwt_paypoad):
-#     jti = jwt_paypoad['jti']
-#     return jti in jwt_blocklist
+######## 로그아웃 ##########
+# 토큰이 존재하면 블록리스트에 토큰을 넣음
+@jwtm.token_in_blocklist_loader
+def check_it_token_is_revoked(jwt_header, jwt_paypoad):
+    jti = jwt_paypoad['jti']
+    return jti in jwt_blocklist
 
 
-# # 토큰을 저장하기 위한 변수 초기화
-# jwt_blocklist = set()
+# 토큰을 저장하기 위한 변수 초기화
+jwt_blocklist = set()
 
-# # 토큰이 존재하면 코드 수행
-# # jti: 토큰을 고유ID로 저장
-# # jwt_blocklist: 토큰의 고유ID, 토큰 유지 기간, 토큰 유지 기간 설정 여부
-# # jwt_bloacklist에 jti만 넣어주고 생략하면 토큰 즉시 파괴
-# @app.route('/logout', methods=['POST'])
-# @jwt_required()
-# def logout():
-#     cur_user = get_jwt_identity()
-
-#     jti = get_jwt()['jti']
-#     jwt_blocklist.add(jti)
-
-#     print(f"로그아웃한 회원의 번호: {cur_user}")
-#     return {'message': 'Log Out'}
-##############################
-
+# 토큰이 존재하면 코드 수행
+# jti: 토큰을 고유ID로 저장
+# jwt_blocklist: 토큰의 고유ID, 토큰 유지 기간, 토큰 유지 기간 설정 여부
+# jwt_bloacklist에 jti만 넣어주고 생략하면 토큰 즉시 파괴
 @app.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
-    response = make_response(redirect("/"))
-    unset_jwt_cookies(response)
-    return response
+    cur_user = get_jwt_identity()
+
+    jti = get_jwt()['jti']
+    jwt_blocklist.add(jti)
+
+    print(f"로그아웃한 회원의 번호: {cur_user}")
+    return {'message': 'Log Out'}
+############################
 
 @app.route('/board/<category>/<status>', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 @jwt_required(optional=True)
