@@ -3,7 +3,8 @@
 import os
 import jwt
 import pymysql  # mysql을 python에서 사용할 시 추가
-from flask import Flask, render_template, redirect, request, session, url_for, jsonify
+import json
+from flask import Flask, render_template, redirect, request, make_response, session, url_for, jsonify
 from flask_jwt_extended import *
 from datetime import datetime, timedelta
 import datetime
@@ -31,17 +32,17 @@ cur = conn.cursor()
 ####################
 
 ##### 관리자 #####
-@jwt_required(optional=True)
-def isAdmin():
-    cur_user = get_jwt_identity()
+def isAdmin(cur_user):
+    if cur_user is None:
+        return 0
+    else:
+        sql = f"select is_admin from member where member_num={cur_user}"
+        cur.execute(sql)
+        conn.commit()
 
-    sql = f"select is_admin from member where member_num={cur_user}"
-    cur.execute(sql)
-    conn.commit()
+        admin = cur.fetchone() # (0,) or (1,)
 
-    isAdmin = cur.fetchone()
-
-    return isAdmin[0]  # 관리자면 1, 아니면 0
+    return admin[0] # 0 or 1
 ####################
 
 # 라우팅: route() 데코레이터는 Flask에서 URL 방문할 때 준비된 함수가 트리거되도록 바인딩
@@ -146,137 +147,55 @@ def logout():
     return {'message': 'Log Out'}
 ##############################
 
-@app.route('/board/comment/write', methods=['POST'])
-@jwt_required(optional=True)
-def writeComment():
-    cur_user = get_jwt_identity()
-
-    post_num = request.form['post_num']
-    member_num = request.form['member_num']
-    member_nickname = request.form['member_nickname']
-    contents = request.form['contents']
-
-    # 비회원 댓글 작성 시
-    if cur_user is None:
-        nonmember_num = randrange(100000)
-        nonmember_nickname = f'비회원_{nonmember_num}'
-        print(f'비회원번호: {nonmember_num}')
-        print(f'비회원닉네임: {nonmember_nickname}')
-        # 실행할 SQL문 정의
-        sql = f'''
-        insert into comment(post_num, member_num, member_nickname, contents)
-        values ({post_num}, {nonmember_num}, '{nonmember_nickname}', '{contents}')
-        '''
-    # 회원 댓글 작성 시
-    else:
-        # 실행할 SQL문 정의
-        sql = f'''
-        insert into comment(post_num, member_num, member_nickname, contents)
-        values ({post_num}, {member_num}, '{member_nickname}', '{contents}')
-        '''
-
-    # cursor.execute(sql): sql문 실행
-    cur.execute(sql)
-    # commit 필요한 작업일 경우 commit
-    conn.commit()
-    return "댓글 작성 완료!"
-
-
-@app.route('/board/comment/modify', methods=['PATCH'])
-@jwt_required(optional=True)
-def modifyComment():
-    cur_user = get_jwt_identity()
-
-    param = request.get_json()
-    comment_num = param['comment_num']
-    contents = param['contents']
-
-    # 작성자만 수정 가능
-    sqlm = f"select member_num from comment where comment_num={comment_num}"
-    cur.execute(sqlm)
-    member_num = cur.fetchone()
-    print(f'member_num(현재 접속 회원): {member_num[0]}')
-
-    if cur_user is None:
-        return "user only!"
-    elif not cur_user == member_num[0]:
-        return "댓글 작성자만 수정 가능합니다."
-    else:
-        sql = f"update comment set contents='{contents}' where comment_num={comment_num}"
-        cur.execute(sql)
-        conn.commit()
-        return "댓글 수정 완료!"
-
-
-@app.route('/board/comment/delete', methods=['delete'])
-@jwt_required(optional=True)
-def deleteComment():
-    cur_user = get_jwt_identity()
-
-    param = request.get_json()
-    comment_num = param['comment_num']
-
-    # 작성자만 삭제 가능
-    sqlm = f"select member_num from comment where comment_num='{comment_num}'"
-    cur.execute(sqlm)
-    member_num = cur.fetchone()
-    print(f'member_num(현재 접속 회원): {member_num[0]}')
-
-    if cur_user is None:
-        return "user only!"
-    elif not cur_user == member_num[0]:
-        return "댓글 작성자만 삭제 가능합니다."
-    else:
-        sql = f"delete from comment where comment_num={comment_num}"
-        cur.execute(sql)
-        conn.commit()
-        return "댓글 삭제 완료!"
-
-# TODO: board 묶기
 @app.route('/board/<category>/<status>', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 @jwt_required(optional=True)
-def boardTest(category, status):
+def board(category, status):
+    cur_user = get_jwt_identity() # 현재 접속 중인 유저의 회원번호를 리턴
+    admin = isAdmin(cur_user)  # 현재 접속 중인 유저의 관리자 여부가 인덱스0에 담긴 튜플을 리턴
+    print(f'접속 유저 번호: {cur_user}')
+    print(f'접속 유저가 관리자인가요?: {admin}')
+
     # GET 요청이거나, Category가 없거나
     if request.method == 'GET' or category is None:
         boardHome()
 
-    # TODO: 공통 유효성
-    cur_user = get_jwt_identity() # 현재 접속 중인 유저의 회원번호를 리턴
-    admin = isAdmin()  # 현재 접속 중인 유저의 관리자 여부가 인덱스0에 담긴 튜플을 리턴
-    print(f'접속 유저 번호: {cur_user}')
-    print(f'접속 유저가 관리자인가요?: {admin}')
-    # 공통 유효성 1. 회원만 작성, 수정, 삭제 가능
+    # 댓글 작성
+    if category == "comment" and status == "write":
+        writeComment(cur_user)
+
+    # 공통 유효성 1. 회원만 작성, 수정, 삭제 가능 (댓글 작성 제외)
     if cur_user is None and admin == 0:
         return "user only!"
 
     if request.method == 'POST':
-        if category == "post":
-            if status == "write":
-                writeTest()
+        if status == "write":
+            if category == "post":
+                return writePost(admin)
 
     if request.method == 'PATCH':
-        if category == "post":
-            if status == "modify":
-                modifyTest(cur_user, admin, status)
+        if status == "modify":
+            if category == "post":
+                modifyPost(cur_user, admin, status)
+            else:
+                modifyComment(cur_user, admin)
 
     if request.method == 'DELETE':
-        if category == "post":
-            if status == "delete":
-                deleteTest(cur_user, admin, status)
+        if status == "delete":
+            if category == "post":
+                deletePost(cur_user, admin, status)
+            else:
+                deleteComment(cur_user, admin)
 
-    if admin == 1:
-        return "관리자로 테스트 성공!"
-    else:
-        return "회원 테스트 성공!"
+    return make_response(jsonify({"status number" : 200, "msg" : "게시판 작업 테스트 성공"}), 200)
 
 ##### 게시판 바로가기 #####
 @app.route('/board')
 def boardHome():
     return render_template("board.html")
-####################
+#########################
 
 ##### 게시글 작성 #####
-def writeTest():
+def writePost(admin):
     param = request.get_json()
     writer_num = param['writer_num']
     writer_nickname = param['writer_nickname']
@@ -285,7 +204,7 @@ def writeTest():
 
     # 실행할 SQL문 정의
     sql = f'''
-    insert into board(writer_num, writer_nickname, title, contents)
+    insert into board (writer_num, writer_nickname, title, contents)
     values ('{writer_num}', '{writer_nickname}', '{title}', '{contents}')
     '''
     # cursor.execute(sql): sql문 실행
@@ -293,11 +212,14 @@ def writeTest():
     # commit 필요한 작업일 경우 commit
     conn.commit()
 
-    return "작성 완료!"
+    if admin == 1:
+        return make_response(jsonify({"status number" : 200, "msg" : "관리자로 게시글 작성 완료!"}), 200)
+    else:
+        return make_response(jsonify({"status number" : 200, "msg" : "게시글 작성 완료!"}), 200)
 ####################
 
 ##### 게시글 수정 #####
-def modifyTest(cur_user, admin, status):
+def modifyPost(cur_user, admin, status):
     param = request.get_json()
     title = param['title']
     contents = param['contents']
@@ -305,9 +227,9 @@ def modifyTest(cur_user, admin, status):
     writer_num = writerNum(post_num)
 
     if not cur_user == writer_num and not admin == 1:
-        return "작성자만 수정 가능합니다."
+        return make_response(jsonify({"status number" : 401, "status msg" : "Unauthorized", "msg" : "작성자만 수정 가능합니다."}), 401)
     elif not changeStatus(post_num, status) and not admin == 1:
-        return "시간이 초과되어 수정하실 수 없습니다. (1시간 제한)"
+        return make_response(jsonify({"status number" : 408, "status msg" : "Request Timeout", "msg" : "시간이 초과되어 수정하실 수 없습니다. (1시간 제한)"}), 408)
     else:
         # 실행할 SQL문 정의
         sql = f"update board set title='{title}', contents='{contents}' where post_num={post_num}"
@@ -315,10 +237,15 @@ def modifyTest(cur_user, admin, status):
         cur.execute(sql)
         # commit 필요한 작업일 경우 commit
         conn.commit()
+
+    if admin == 1:
+        return make_response(jsonify({"status number" : 200, "msg" : "관리자로 게시글 수정 완료!"}), 200)
+    else:
+        return make_response(jsonify({"status number" : 200, "msg" : "게시글 수정 완료!"}), 200)
 ####################
 
 ##### 게시글 삭제 #####
-def deleteTest(cur_user, admin, status):
+def deletePost(cur_user, admin, status):
     param = request.get_json()
     post_num = param['post_num']
     writer_num = writerNum(post_num)
@@ -334,17 +261,97 @@ def deleteTest(cur_user, admin, status):
         cur.execute(sql)
         # commit 필요한 작업일 경우 commit
         conn.commit()
-        return {"http_response_status" : "ok"}, 200
+####################
+
+##### 댓글 작성 #####
+def writeComment(cur_user):
+    print('댓글작성함수안의 현재유저: ', cur_user)
+    param = request.get_json()
+    post_num = param['post_num']
+    member_num = param['member_num']
+    member_nickname = param['member_nickname']
+    contents = param['contents']
+
+    nonmember_num = randrange(100000)
+    nonmember_nickname = f'비회원_{nonmember_num}'
+    print(f'비회원번호: {nonmember_num}')
+    print(f'비회원닉네임: {nonmember_nickname}')
+
+    # 비회원 댓글 작성 시
+    if cur_user is None:
+        # nonmember_num = randrange(100000)
+        # nonmember_nickname = f'비회원_{nonmember_num}'
+        # print(f'비회원번호: {nonmember_num}')
+        # print(f'비회원닉네임: {nonmember_nickname}')
+        # 실행할 SQL문 정의
+        sql = f'''
+        insert into comment(post_num, member_num, member_nickname, contents)
+        values ({post_num}, {nonmember_num}, '{nonmember_nickname}', '{contents}')
+        '''
+    # 회원 댓글 작성 시
+    else:
+        # member_num = param['member_num']
+        # member_nickname = param['member_nickname']
+        # 실행할 SQL문 정의
+        sql = f'''
+        insert into comment(post_num, member_num, member_nickname, contents)
+        values ({post_num}, {member_num}, '{member_nickname}', '{contents}')
+        '''
+
+    # cursor.execute(sql): sql문 실행
+    cur.execute(sql)
+    # commit 필요한 작업일 경우 commit
+    conn.commit()
+####################
+
+##### 댓글 수정 #####
+def modifyComment(cur_user, admin):
+    param = request.get_json()
+    contents = param['contents']
+    comment_num = param['comment_num']
+    commenter_num = commenterNum(comment_num)
+
+    if not cur_user == commenter_num and not admin == 1:
+        return "댓글 작성자만 수정 가능합니다."
+    else:
+        sql = f"update comment set contents='{contents}' where comment_num={comment_num}"
+        cur.execute(sql)
+        conn.commit()
+        return "댓글 수정 완료!"
+####################
+
+##### 댓글 삭제 #####
+def deleteComment(cur_user, admin):
+    param = request.get_json()
+    comment_num = param['comment_num']
+    commenter_num = commenterNum(comment_num)
+
+    if not cur_user == commenter_num and not admin == 1:
+        return "댓글 작성자만 삭제 가능합니다."
+    else:
+        sql = f"delete from comment where comment_num={comment_num}"
+        cur.execute(sql)
+        conn.commit()
+        return "댓글 삭제 완료!"
 ####################
 
 
 ##### 작성자 번호 #####
 def writerNum(post_num):
-    sqlw = f"select writer_num from board where post_num={post_num}"
-    cur.execute(sqlw)
+    sql = f"select writer_num from board where post_num={post_num}"
+    cur.execute(sql)
     writer_num = cur.fetchone()
 
     return writer_num[0]
+####################
+
+##### 댓글 작성자 번호 #####
+def commenterNum(comment_num):
+    sql = f"select member_num from comment where comment_num={comment_num}"
+    cur.execute(sql)
+    commenter_num = cur.fetchone()
+
+    return commenter_num[0]
 ####################
 
 ##### 상태 변경 가능 여부 (현재시각 > 작성시각 + 제한시간이면 상태 변경 불가) #####
