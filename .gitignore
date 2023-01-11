@@ -18,3 +18,6 @@ requirements
 
 # env var
 .env
+
+# test
+app_test.py

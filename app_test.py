@@ -24,7 +24,7 @@
 #         else:
 #             conn.rollback()
 #             return "가입 실패"
-    
+
 #     return render_template('sign-up.html')
 ###############
 # @app.route('/login', methods=['GET', 'POST'])
@@ -37,7 +37,7 @@
 #     elif request.method == 'POST':
 #         id = request.form.get('id')
 #         pw = request.form.get('pw')
-        
+
 #         if len(id) == 0 or len(pw) == 0:
 #             return '입력되지 않은 정보가 있습니다.'
 #         else:
@@ -82,3 +82,13 @@
 # if __name__ == '__main__':
 #     # debug=True 명시하면 해당 파일 코드 수정 시 Flask가 변경된 것을 인식하고 다시 시작
 #     app.run(debug=True)
+###############
+# bcrypt 사용
+# import bcrypt
+
+# pw ="12345"
+# compare_pw="123456"
+# encoded_pw = bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt(rounds=10))
+# print('password',pw)
+# print('encrypted',encoded_pw)
+# print(bcrypt.checkpw(compare_pw.encode('utf-8'), encoded_pw))
