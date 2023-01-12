@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import datetime
 from config import HOST, USER, PASSWORD, DB, CHARSET, APP_SECRET_KEY, JWT_SECRET_KEY  # 환경변수
 from random import randrange  # 난수 생성에 필요한 모듈
-from flask_bcrypt import Bcrypt
+# from flask_bcrypt import Bcrypt
 import bcrypt
 ####################
 
@@ -25,8 +25,8 @@ jwtm = JWTManager(app)
 ####################
 
 ##### 암호화 설정 #####
-app.config['BCRYPT_LEVEL'] = 10
-bcryptm = Bcrypt(app)
+# app.config['BCRYPT_LEVEL'] = 10
+# bcryptm = Bcrypt(app)
 ####################
 
 ##### DB 연결 #####
@@ -305,12 +305,16 @@ def writeComment(cur_user, admin):
     if cur_user is None:
         nonmember_num = randrange(100000)
         nonmember_nickname = f'비회원_{nonmember_num}'
+        non_pw = param['access_password'] # 비회원이 댓글 등록 시 설정한 댓글 비밀번호
+        encoded_pw = bcrypt.hashpw(non_pw.encode("utf-8"), bcrypt.gensalt(rounds=10))
+        decoded_pw = encoded_pw.decode('utf-8')
+
         print(f'비회원번호: {nonmember_num}')
         print(f'비회원닉네임: {nonmember_nickname}')
         # 실행할 SQL문 정의
         sql = f'''
-        insert into comment (board_id, nickname, content)
-        values ({post_num}, '{nonmember_nickname}', '{content}');
+        insert into comment (board_id, nickname, content, access_password)
+        values ({post_num}, '{nonmember_nickname}', '{content}', '{decoded_pw}');
         '''
     # 회원 댓글 작성 시
     else:
@@ -329,8 +333,8 @@ def writeComment(cur_user, admin):
 
     if admin == 1:
         return make_response(jsonify({"result" : True, "is_admin" : f"{admin}", "msg" : "관리자로 댓글 작성 완료!"}), 200)
-    elif member_num is None:
-        return make_response(jsonify({"result" : True, "is_admin" : f"{admin}", "msg" : "비회원으로 댓글 작성 완료!"}), 200)
+    # elif member_num is None:
+    #     return make_response(jsonify({"result" : True, "is_admin" : f"{admin}", "msg" : "비회원으로 댓글 작성 완료!"}), 200)
     else:
         return make_response(jsonify({"result" : True, "is_admin" : f"{admin}", "msg" : "댓글 작성 완료!"}), 200)
 ####################
@@ -344,6 +348,9 @@ def modifyComment(cur_user, admin):
 
     if not cur_user == commenter_num and not admin == 1:
         return make_response(jsonify({"result" : False, "is_admin" : f"{admin}", "msg" : "댓글 작성자만 수정 가능합니다."}), 401)
+    # 비회원 댓글 수정 시
+    # elif cur_user is None:
+    #     access_password =
     else:
         sql = f"update comment set content='{content}' where id={comment_num};"
         cur.execute(sql)
