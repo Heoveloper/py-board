@@ -11,10 +11,13 @@ from config import HOST, USER, PASSWORD, DB, CHARSET, APP_SECRET_KEY, JWT_SECRET
 from random import randrange  # 난수 생성에 필요한 모듈
 # from flask_bcrypt import Bcrypt
 import bcrypt
+from error_handler import error_handle
 ####################
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY
+
+error_handle(app)
 
 ##### JWT 설정 #####
 app.config.update(
